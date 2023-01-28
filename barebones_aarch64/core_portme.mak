@@ -15,22 +15,25 @@
 # Original Author: Shay Gal-on
 
 #File : core_portme.mak
-
+AARCH64_TOOLS = aarch64-none-elf-
 # Flag : OUTFLAG
 #	Use this flag to define how to to get an executable (e.g -o)
 OUTFLAG= -o
 # Flag : CC
 #	Use this flag to define compiler to use
-CC 		= gcc
+CC 		= $(AARCH64_TOOLS)gcc
 # Flag : LD
 #	Use this flag to define compiler to use
-LD		= gld
+LD		= $(AARCH64_TOOLS)gcc
 # Flag : AS
 #	Use this flag to define compiler to use
-AS		= gas
+AS		= $(AARCH64_TOOLS)as
+# Flag : OBJDUMP
+#	Use this flag to define compiler to use
+OBJDUMP		= $(AARCH64_TOOLS)objdump
 # Flag : CFLAGS
 #	Use this flag to define compiler options. Note, you can add compiler options from the command line using XCFLAGS="other flags"
-PORT_CFLAGS = -O0 -g
+PORT_CFLAGS = -O2 -g -DGCC
 FLAGS_STR = "$(PORT_CFLAGS) $(XCFLAGS) $(XLFLAGS) $(LFLAGS_END)"
 CFLAGS = $(PORT_CFLAGS) -I$(PORT_DIR) -I. -DFLAGS_STR=\"$(FLAGS_STR)\" 
 #Flag : LFLAGS_END
@@ -40,16 +43,32 @@ SEPARATE_COMPILE=1
 # Flag : SEPARATE_COMPILE
 # You must also define below how to create an object file, and how to link.
 OBJOUT 	= -o
-LFLAGS 	= 
-ASFLAGS =
+LFLAGS 	= -T $(PORT_DIR)/link_csrc_aarch64.ld -static
+ARCH = armv8.5-a
+ASFLAGS = -march=$(ARCH) -I$(PORT_DIR)
 OFLAG 	= -o
 COUT 	= -c
 
-LFLAGS_END = 
+# avoid auto-turning iterations
+ifndef ITERATIONS
+ITERATIONS=1
+endif
+
+LFLAGS_END =
 # Flag : PORT_SRCS
 # 	Port specific source files can be added here
 #	You may also need cvt.c if the fcvt functions are not provided as intrinsics by your compiler!
-PORT_SRCS = $(PORT_DIR)/core_portme.c $(PORT_DIR)/ee_printf.c
+PORT_SRCS_C = $(addprefix $(PORT_DIR)/, core_portme ee_printf cvt output_trickbox retarget-gcc)
+PORT_SRCS_S = $(addprefix $(PORT_DIR)/, bootcode pagetables stackheap vectors)
+
+PORT_SRCS = $(addsuffix .c, $(PORT_SRCS_C)) $(addsuffix .s, $(PORT_SRCS_S))
+
+PORT_OBJS = $(addsuffix $(OEXT), $(PORT_SRCS_C) $(PORT_SRCS_S))
+
+PORT_INCLUDE = $(wildcard $(PORT_DIR)/*.h)
+
+EXTRA_DEPENDS = $(PORT_INCLUDE) $(PORT_DIR)/core_portme.mak $(PORT_DIR)/link_csrc_aarch64.ld
+
 vpath %.c $(PORT_DIR)
 vpath %.s $(PORT_DIR)
 
@@ -63,22 +82,55 @@ LOAD = echo "Please set LOAD to the process of loading the executable to the fla
 RUN = echo "Please set LOAD to the process of running the executable (e.g. via jtag, or board reset)"
 
 OEXT = .o
-EXE = .bin
+EXE = .elf
 
-$(OPATH)$(PORT_DIR)/%$(OEXT) : %.c
+$(OPATH)$(PORT_DIR)/%$(OEXT) : %.c $(EXTRA_DEPENDS)
 	$(CC) $(CFLAGS) $(XCFLAGS) $(COUT) $< $(OBJOUT) $@
 
-$(OPATH)%$(OEXT) : %.c
+$(OPATH)%$(OEXT) : %.c $(EXTRA_DEPENDS)
 	$(CC) $(CFLAGS) $(XCFLAGS) $(COUT) $< $(OBJOUT) $@
 
-$(OPATH)$(PORT_DIR)/%$(OEXT) : %.s
+$(OPATH)$(PORT_DIR)/%$(OEXT) : %.s $(EXTRA_DEPENDS)
 	$(AS) $(ASFLAGS) $< $(OBJOUT) $@
 
 # Target : port_pre% and port_post%
 # For the purpose of this simple port, no pre or post steps needed.
 
-.PHONY : port_prebuild port_postbuild port_prerun port_postrun port_preload port_postload
-port_pre% port_post% : 
+
+.PHONY: port_prebuild
+port_prebuild:
+	
+# Target: port_postbuild
+# Generate any files that are needed after actual build end.
+# E.g. change format to srec, bin, zip in order to be able to load into flash
+.PHONY: port_postbuild
+port_postbuild:
+	@echo "=============================================="
+	@echo "barebones_aarch64 build succeed!"
+	@echo "you can run coremark.elf in your environment!"
+	@echo "=============================================="
+# Target: port_postrun
+# 	Do platform specific after run stuff. 
+#	E.g. reset the board, backup the logfiles etc.
+.PHONY: port_postrun
+port_postrun:
+# Target: port_prerun
+# 	Do platform specific after run stuff. 
+#	E.g. reset the board, backup the logfiles etc.
+.PHONY: port_prerun
+port_prerun:
+
+# Target: port_postload
+# 	Do platform specific after load stuff. 
+#	E.g. reset the reset power to the flash eraser
+.PHONY: port_postload
+port_postload:
+
+# Target: port_preload
+# 	Do platform specific before load stuff. 
+#	E.g. reset the reset power to the flash eraser
+.PHONY: port_preload
+port_preload:
 
 # FLAG : OPATH
 # Path to the output folder. Default - current folder.

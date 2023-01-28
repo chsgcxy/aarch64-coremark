@@ -76,6 +76,9 @@ Original Author: Shay Gal-on
 #define MEM_LOCATION "STACK"
 #endif
 
+#include <stdint.h>
+#include <stdio.h>
+
 /* Data Types :
         To avoid compiler issues, define the data types that need ot be used for
    8b, 16b and 32b in <core_portme.h>.
@@ -90,7 +93,7 @@ typedef signed int     ee_s32;
 typedef double         ee_f32;
 typedef unsigned char  ee_u8;
 typedef unsigned int   ee_u32;
-typedef ee_u32         ee_ptr_int;
+typedef uintptr_t      ee_ptr_int;
 typedef size_t         ee_size_t;
 #define NULL ((void *)0)
 /* align_mem :
